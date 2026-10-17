@@ -1,14 +1,62 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>需求澄清器</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>需求澄清器 · 把模糊需求问清楚</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>需求澄清器</h1>
-    <p>把说不清的需求，变成AI接得住的提示词。</p>
-    <input id="need" placeholder="用大白话写下你要做的事">
-    <button onclick="alert('Day1 只有骨架，逻辑从明天开始写')">生成提示词</button>
+<header class="top">
+  <h1>需求澄清器</h1>
+  <p class="sub">把模糊需求，问成「AI 能执行、你能验收」的提示词</p>
+</header>
+
+<main id="app">
+
+  <!-- 首屏 -->
+  <section id="start" class="card">
+    <label class="label" for="idea">用大白话写下你要做的事</label>
+    <textarea id="idea" rows="4" placeholder="例如：帮我做个介绍贵州的 PPT，给同学看，顺便交个作业"></textarea>
+    <div class="row">
+      <button id="btnWizard" class="btn primary">开始，帮我把需求问清楚（8 步）</button>
+      <button id="btnClarify" class="btn ghost">先让 AI 来问我</button>
+    </div>
+    <p class="note">不联网 · 不上传 · 手机可用</p>
+  </section>
+
+  <!-- 向导 -->
+  <section id="wizard" class="card hidden">
+    <div class="progress"><div id="bar"></div></div>
+    <div id="stepMeta" class="meta"></div>
+    <h2 id="qTitle"></h2>
+    <p id="qHint" class="hint"></p>
+    <div id="options" class="options"></div>
+    <label class="label" for="answer">或者用自己的话写（可以只选上面的推荐答案）：</label>
+    <textarea id="answer" rows="3" placeholder="补充细节；不填也可以，前提是上面选了一个推荐答案"></textarea>
+    <div class="row between">
+      <button id="btnPrev" class="btn ghost">上一步</button>
+      <span id="counter" class="counter"></span>
+      <button id="btnNext" class="btn primary">下一步</button>
+    </div>
+  </section>
+
+  <!-- 结果 -->
+  <section id="result" class="card hidden">
+    <h2 id="resultTitle">你的需求提示词</h2>
+    <p class="hint">直接复制，粘给豆包 / DeepSeek / 任何 AI 都行。</p>
+    <pre id="output" class="output"></pre>
+    <div class="row">
+      <button id="btnCopy" class="btn primary">一键复制</button>
+      <button id="btnRestart" class="btn ghost">重新开始</button>
+    </div>
+    <p id="copyMsg" class="msg hidden">已复制 ✓</p>
+  </section>
+
+</main>
+
+<footer class="foot">需求澄清器 v0.1 · 开源仓库 github.com/cx0806V/requirement-clarifier</footer>
+
+<script src="app.js"></script>
 </body>
 </html>
