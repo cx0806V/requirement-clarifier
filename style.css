@@ -126,6 +126,36 @@ textarea:focus { outline: 2px solid #bfdbfe; border-color: var(--primary); backg
 
 .foot { max-width: 720px; width: 100%; margin: 18px auto 8px; color: #9ca3af; font-size: 12px; text-align: center; }
 
+/* ---------- v0.2：模式切换 + 示例 ---------- */
+.modes { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 2px; }
+.mode {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: .15s;
+}
+.mode:hover { border-color: #c9ced6; }
+.mode.on { border-color: var(--primary); background: var(--chip); color: #3730a3; font-weight: 600; }
+
+.examples { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.ex {
+  border: 1px dashed var(--chip-line);
+  background: #fff;
+  color: #4f46e5;
+  border-radius: 99px;
+  padding: 5px 11px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: .15s;
+}
+.ex:hover { border-color: var(--primary); background: var(--chip); }
+
 @media (max-width: 560px) {
   body { padding: 10px; }
   .top h1 { font-size: 22px; }
@@ -133,4 +163,5 @@ textarea:focus { outline: 2px solid #bfdbfe; border-color: var(--primary); backg
   .btn { width: 100%; }
   .row.between .btn { width: auto; }
   .output { max-height: 45vh; }
+  .mode { flex: 1 1 45%; }
 }

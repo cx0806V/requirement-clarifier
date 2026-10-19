@@ -3,26 +3,39 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>需求澄清器 · 把模糊需求问清楚</title>
+<title>需求澄清器 · 你只管说想法，它帮你问清楚</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header class="top">
   <h1>需求澄清器</h1>
-  <p class="sub">把模糊需求，问成「AI 能执行、你能验收」的提示词</p>
+  <p class="sub">你只管说想法，它帮你问清楚，最后给你一段能直接发给 AI 的话</p>
 </header>
 
 <main id="app">
 
   <!-- 首屏 -->
   <section id="start" class="card">
-    <label class="label" for="idea">用大白话写下你要做的事</label>
-    <textarea id="idea" rows="4" placeholder="例如：帮我做个介绍贵州的 PPT，给同学看，顺便交个作业"></textarea>
-    <div class="row">
-      <button id="btnWizard" class="btn primary">开始，帮我把需求问清楚（8 步）</button>
-      <button id="btnClarify" class="btn ghost">先让 AI 来问我</button>
+    <p class="label">你现在是什么情况？</p>
+    <div class="modes" id="modes">
+      <button type="button" class="mode on" data-mode="dev">我会用 AI，但说不清需求</button>
+      <button type="button" class="mode" data-mode="zero">我从没用过 AI</button>
     </div>
-    <p class="note">不联网 · 不上传 · 手机可用</p>
+    <p class="note" id="modeNote">半开发者版：问 8 个问题，最后给你一份结构化需求。</p>
+
+    <label class="label" for="idea">你想做什么？用大白话写就行</label>
+    <textarea id="idea" rows="4" placeholder="例如：做个介绍贵州的 PPT，给同学看，顺便交个作业"></textarea>
+    <div class="examples" id="examples">
+      <button type="button" class="ex">做个介绍贵州的 PPT</button>
+      <button type="button" class="ex">帮我写一条请假申请</button>
+      <button type="button" class="ex">写个能跑的 Python 爬虫</button>
+    </div>
+
+    <div class="row">
+      <button id="btnWizard" class="btn primary">开始（一共 8 个问题）</button>
+      <button id="btnClarify" class="btn ghost">不答题，直接生成「让 AI 来问我」的话</button>
+    </div>
+    <p class="note">不联网 · 不上传 · 手机能用</p>
   </section>
 
   <!-- 向导 -->
@@ -32,8 +45,8 @@
     <h2 id="qTitle"></h2>
     <p id="qHint" class="hint"></p>
     <div id="options" class="options"></div>
-    <label class="label" for="answer">或者用自己的话写（可以只选上面的推荐答案）：</label>
-    <textarea id="answer" rows="3" placeholder="补充细节；不填也可以，前提是上面选了一个推荐答案"></textarea>
+    <label class="label" for="answer">也可以用自己的话补一句（不写也行）</label>
+    <textarea id="answer" rows="3" placeholder="补充细节。上面选一个推荐答案，这里可以不写"></textarea>
     <div class="row between">
       <button id="btnPrev" class="btn ghost">上一步</button>
       <span id="counter" class="counter"></span>
@@ -43,11 +56,13 @@
 
   <!-- 结果 -->
   <section id="result" class="card hidden">
-    <h2 id="resultTitle">你的需求提示词</h2>
-    <p class="hint">直接复制，粘给豆包 / DeepSeek / 任何 AI 都行。</p>
+    <h2 id="resultTitle">生成好了，直接复制给 AI</h2>
+    <p id="gaps" class="hint"></p>
+    <p class="hint">复制后粘给豆包 / DeepSeek / 任何 AI 都行。</p>
     <pre id="output" class="output"></pre>
     <div class="row">
       <button id="btnCopy" class="btn primary">一键复制</button>
+      <button id="btnEdit" class="btn ghost">返回修改</button>
       <button id="btnRestart" class="btn ghost">重新开始</button>
     </div>
     <p id="copyMsg" class="msg hidden">已复制 ✓</p>
@@ -55,7 +70,7 @@
 
 </main>
 
-<footer class="foot">需求澄清器 v0.1 · 开源仓库 github.com/cx0806V/requirement-clarifier</footer>
+<footer class="foot">需求澄清器 v0.2 · 开源仓库 github.com/cx0806V/requirement-clarifier</footer>
 
 <script src="app.js"></script>
 </body>
