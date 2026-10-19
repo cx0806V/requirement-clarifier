@@ -9,7 +9,7 @@
 <body>
 <header class="top">
   <h1>需求澄清器</h1>
-  <p class="sub">你只管说想法，它帮你问清楚，最后给你一段能直接发给 AI 的话</p>
+  <p class="sub">你只管说想法：它帮你出题，或者生成一段让 DeepSeek 来问你的话</p>
 </header>
 
 <main id="app">
@@ -18,22 +18,24 @@
   <section id="start" class="card">
     <p class="label">你现在是什么情况？</p>
     <div class="modes" id="modes">
-      <button type="button" class="mode on" data-mode="dev">我会用 AI，但说不清需求</button>
-      <button type="button" class="mode" data-mode="zero">我从没用过 AI</button>
+      <button type="button" id="btnModeDev" class="mode on">我会用 AI，但说不清需求</button>
+      <button type="button" id="btnModeZero" class="mode">我从没用过 AI</button>
     </div>
-    <p class="note" id="modeNote">半开发者版：问 8 个问题，最后给你一份结构化需求。</p>
+    <p class="note" id="modeNote">半开发者版：按你的需求动态出题，也可以生成给 DeepSeek 的提示词。</p>
 
     <label class="label" for="idea">你想做什么？用大白话写就行</label>
     <textarea id="idea" rows="4" placeholder="例如：做个介绍贵州的 PPT，给同学看，顺便交个作业"></textarea>
+    <p id="catHint" class="hint"></p>
     <div class="examples" id="examples">
-      <button type="button" class="ex">做个介绍贵州的 PPT</button>
-      <button type="button" class="ex">帮我写一条请假申请</button>
-      <button type="button" class="ex">写个能跑的 Python 爬虫</button>
+      <button type="button" id="ex1" class="ex">做个介绍贵州的 PPT</button>
+      <button type="button" id="ex2" class="ex">帮我写一条请假申请</button>
+      <button type="button" id="ex3" class="ex">写个能跑的 Python 爬虫</button>
     </div>
 
     <div class="row">
-      <button id="btnWizard" class="btn primary">开始（一共 8 个问题）</button>
-      <button id="btnClarify" class="btn ghost">不答题，直接生成「让 AI 来问我」的话</button>
+      <button id="btnWizard" class="btn primary">开始（约 8 个问题）</button>
+      <button id="btnClarify" class="btn ghost">生成给 DeepSeek 的提示词（推荐）</button>
+      <button id="btnShuffle" class="btn ghost">换一批问法</button>
     </div>
     <p class="note">不联网 · 不上传 · 手机能用</p>
   </section>
@@ -47,6 +49,11 @@
     <div id="options" class="options"></div>
     <label class="label" for="answer">也可以用自己的话补一句（不写也行）</label>
     <textarea id="answer" rows="3" placeholder="补充细节。上面选一个推荐答案，这里可以不写"></textarea>
+    <div class="vrow">
+      <span class="votehint">这题有用吗？</span>
+      <button type="button" id="btnUp" class="vbtn">👍 有用</button>
+      <button type="button" id="btnDown" class="vbtn">👎 没用</button>
+    </div>
     <div class="row between">
       <button id="btnPrev" class="btn ghost">上一步</button>
       <span id="counter" class="counter"></span>
@@ -58,20 +65,61 @@
   <section id="result" class="card hidden">
     <h2 id="resultTitle">生成好了，直接复制给 AI</h2>
     <p id="gaps" class="hint"></p>
-    <p class="hint">复制后粘给豆包 / DeepSeek / 任何 AI 都行。</p>
+    <p id="resultHint" class="hint">复制后粘给豆包 / DeepSeek / 任何 AI 都行。</p>
     <pre id="output" class="output"></pre>
+
+    <!-- 两段式：把 DeepSeek 的总结贴回来 -->
+    <div id="pasteArea" class="paste hidden">
+      <label class="label" for="pasted">DeepSeek 问完之后，把它输出的「需求总结」整段贴到这里：</label>
+      <textarea id="pasted" rows="4" placeholder="把 DeepSeek 输出的 # 需求总结 整段粘贴进来"></textarea>
+      <div class="row">
+        <button id="btnAssemble" class="btn primary">生成最终需求</button>
+      </div>
+    </div>
+
     <div class="row">
       <button id="btnCopy" class="btn primary">一键复制</button>
+      <button id="btnReshuffle" class="btn ghost hidden">换一批问法</button>
       <button id="btnEdit" class="btn ghost">返回修改</button>
       <button id="btnRestart" class="btn ghost">重新开始</button>
     </div>
     <p id="copyMsg" class="msg hidden">已复制 ✓</p>
+    <p class="note">这组问题有用吗？<button id="btnFeedback" class="linkbtn">去反馈</button></p>
+  </section>
+
+  <!-- 问题反馈 -->
+  <section id="feedback" class="card hidden">
+    <h2>问题反馈</h2>
+    <p class="hint">只存在你这台设备上，不会上传。可以「复制反馈」发我，或「导出文件」。</p>
+
+    <p class="label">这组问题整体有用吗？</p>
+    <div class="modes" id="fbOverall">
+      <button type="button" id="fbGood" class="mode on">有用</button>
+      <button type="button" id="fbMid" class="mode">一般</button>
+      <button type="button" id="fbBad" class="mode">没用</button>
+    </div>
+
+    <div id="fbqList" class="fbq"></div>
+
+    <label class="label" for="fbStuck">哪一步卡住了 / 哪里看不懂？</label>
+    <textarea id="fbStuck" rows="3" placeholder="例如：第 3 题不知道选什么；生成的提示词太长"></textarea>
+    <label class="label" for="fbSuggest">建议（可选）</label>
+    <textarea id="fbSuggest" rows="2" placeholder="例如：希望能选自己的模板；想问的问题更多一点"></textarea>
+
+    <div class="row">
+      <button id="btnSaveFb" class="btn primary">保存到本机</button>
+      <button id="btnCopyFb" class="btn ghost">复制反馈</button>
+      <button id="btnExportFb" class="btn ghost">导出文件</button>
+      <button id="btnBackStart" class="btn ghost">回到首页</button>
+    </div>
+    <p id="fbMsg" class="msg hidden">已保存 ✓</p>
   </section>
 
 </main>
 
-<footer class="foot">需求澄清器 v0.2 · 开源仓库 github.com/cx0806V/requirement-clarifier</footer>
+<footer class="foot">需求澄清器 v0.3 · 开源仓库 github.com/cx0806V/requirement-clarifier · <button id="btnFeedbackFoot" class="linkbtn">问题反馈</button></footer>
 
+<script src="bank.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

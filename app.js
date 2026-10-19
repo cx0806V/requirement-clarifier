@@ -1,119 +1,75 @@
 (function () {
   'use strict';
 
-  // ============ 8 项追问（2026-10-19 全部改成大白话） ============
-  var QUESTIONS = [
-    {
-      id: 1, dim: '先定目标', short: '目标', required: true,
-      title: '做完这件事，你想拿到什么？',
-      hint: '一句话说清。例：做一份介绍贵州的 10 页 PPT，给同学看。',
-      options: ['写一份能直接交的文档', '做出能跑的代码或工具', '做一个别人能点开的网页', '整理一份能直接发出去的材料']
-    },
-    {
-      id: 2, dim: '先定目标', short: '给谁看', required: false,
-      title: '做出来给谁看？谁会用？',
-      hint: '给谁看，决定了 AI 用什么语气、说多深。',
-      options: ['老师 / 评委', '同学 / 朋友', '客户 / 老板', '就我自己用', '不确定，按最常见的来']
-    },
-    {
-      id: 3, dim: '先定目标', short: '现有材料', required: false,
-      title: '你手上现在有什么材料？',
-      hint: '说「没有」也行，但 AI 更容易乱编。',
-      options: ['没有，全靠 AI 生成', '我有零散的想法或笔记', '我有参考资料或链接', '我有现成的数据或文件', '我有旧版本，要改']
-    },
-    {
-      id: 4, dim: '要什么东西', short: '交付物', required: true,
-      title: '最后要拿到什么？多少？',
-      hint: '格式、数量越具体，AI 越不容易跑偏。',
-      options: ['PPT（写清几页）', '一段文字（写清多少字）', '代码（写清用什么语言）', '表格 / 清单', '一段能直接发给 AI 的话']
-    },
-    {
-      id: 5, dim: '要什么东西', short: '限制', required: false,
-      title: '有什么限制不能违反？',
-      hint: '字数、页数、时间、平台、预算，想到的都写上。',
-      options: ['字数或页数有上限', '今晚 / 明天就要', '只能在手机上做', '必须离线用', '没有特别限制']
-    },
-    {
-      id: 6, dim: '怎么算做好', short: '最怕的', required: false,
-      title: '你最怕 AI 做成什么样？',
-      hint: '说清最怕的，比说清想要的更管用。',
-      options: ['全是空话，没有干货', '太长 / 页数太多', '不是我要的格式', '编数据、胡说', '套模板，没有我的信息']
-    },
-    {
-      id: 7, dim: '怎么算做好', short: '算好的标准', required: true,
-      title: '怎么算做好了？',
-      hint: '写 3 条能打勾的。例：① 3 分钟能看完 ② 每个数字都有出处 ③ 能直接粘进 PPT',
-      options: ['能直接交 / 直接发出去', '给 3 个人看，不用解释也懂', '每条内容都能找到出处', '跑一遍不报错', '不超过规定的长度']
-    },
-    {
-      id: 8, dim: '分几步', short: '第一版', required: false,
-      title: '第一版先做到哪一步？',
-      hint: '先说清「这次不做什么」，比说清「要做什么」更重要。',
-      options: ['先做能交的 60 分版本', '第一版就要 90 分，时间够', '先做核心的一页，够用再加', '不知道，先给我个最小版本']
-    }
-  ];
-
-  // ============ 两种模式（2026-10-19 定：零基础 + 半开发者） ============
+  // ============ 模式（2026-10-19 定：零基础 + 半开发者） ============
   var MODES = {
     dev: {
       label: '半开发者',
-      qids: [1, 2, 3, 4, 5, 6, 7, 8],
-      required: [1, 4, 7],
-      output: 'structured',
-      note: '半开发者版：问 8 个问题，最后给你一份结构化需求。'
+      note: '半开发者版：按你的需求动态出题；也可以生成一段给 DeepSeek 的提示词，让 AI 来问你。'
     },
     zero: {
       label: '零基础',
-      qids: [1, 2, 4, 6, 7],
-      required: [1, 4, 7],
-      output: 'plain',
-      note: '零基础版：只问 5 个问题，每题都有现成答案，最后给你一段话。'
+      note: '零基础版：只问 5 题，每题都有现成答案，最后给你一段话。'
     }
   };
 
   var DRAFT_KEY = 'reqclarify_v01_draft';
   var MODE_KEY = 'reqclarify_v02_mode';
+  var FB_KEY = 'reqclarify_feedback_v1';
 
-  var state = { idea: '', answers: {}, index: 0, mode: 'dev' };
+  var state = {
+    idea: '',
+    mode: 'dev',
+    salt: 0,
+    category: 'general',
+    catLabel: '通用',
+    qs: [],
+    answers: {},
+    index: 0,
+    lastType: 'rules',
+    fb: { overall: 3, votes: {}, stuck: '', suggest: '' }
+  };
 
   function $(id) { return document.getElementById(id); }
-  function mode() { return MODES[state.mode]; }
+  function hasText(v) { return !!(v && String(v).trim()); }
+  function modeConf() { return MODES[state.mode]; }
 
-  function qlist() {
-    var out = [];
-    mode().qids.forEach(function (id) {
-      for (var i = 0; i < QUESTIONS.length; i++) {
-        if (QUESTIONS[i].id === id) { out.push(QUESTIONS[i]); break; }
-      }
-    });
-    return out;
+  // ============ 出题（规则式个性化） ============
+  function regenerate() {
+    var r = REQ_BANK.build(state.idea, state.mode, state.salt);
+    state.category = r.category;
+    state.catLabel = r.label;
+    state.qs = r.questions;
   }
 
-  function isRequired(q) { return mode().required.indexOf(q.id) !== -1; }
+  function catHintText() {
+    if (!hasText(state.idea)) {
+      return '写完我会先判断类型（PPT / 代码 / 文案 / 表格 / 学习 / 生活），再出对应的题。';
+    }
+    return '识别为「' + state.catLabel + '」· 预计问 ' + state.qs.length + ' 个问题。';
+  }
 
   // ============ 模式切换 ============
   function applyMode(name, persist) {
     state.mode = MODES[name] ? name : 'dev';
-    var nodes = document.querySelectorAll('#modes .mode');
-    for (var i = 0; i < nodes.length; i++) {
-      nodes[i].classList.toggle('on', nodes[i].getAttribute('data-mode') === state.mode);
-    }
-    $('modeNote').textContent = mode().note;
-    $('btnWizard').textContent = '开始（一共 ' + mode().qids.length + ' 个问题）';
-    if (persist) {
-      try { localStorage.setItem(MODE_KEY, state.mode); } catch (e) { /* 忽略 */ }
-    }
+    $('btnModeDev').classList.toggle('on', state.mode === 'dev');
+    $('btnModeZero').classList.toggle('on', state.mode === 'zero');
+    $('modeNote').textContent = modeConf().note;
+    $('btnClarify').classList.toggle('hidden', state.mode === 'zero');
+    regenerate();
+    $('btnWizard').textContent = '开始（约 ' + state.qs.length + ' 个问题）';
+    $('catHint').textContent = catHintText();
+    if (persist) { try { localStorage.setItem(MODE_KEY, state.mode); } catch (e) { /* 忽略 */ } }
   }
 
-  // ============ 草稿保存 ============
+  // ============ 草稿 ============
   function saveDraft() {
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify({
-        idea: state.idea, answers: state.answers, mode: state.mode
+        idea: state.idea, answers: state.answers, mode: state.mode, salt: state.salt
       }));
     } catch (e) { /* 忽略 */ }
   }
-
   function loadDraft() {
     try {
       var m = localStorage.getItem(MODE_KEY);
@@ -125,44 +81,34 @@
       state.idea = d.idea || '';
       state.answers = d.answers || {};
       if (d.mode && MODES[d.mode]) state.mode = d.mode;
+      if (typeof d.salt === 'number') state.salt = d.salt;
       $('idea').value = state.idea;
     } catch (e) { /* 忽略 */ }
   }
-
-  function clearDraft() {
-    try { localStorage.removeItem(DRAFT_KEY); } catch (e) { /* 忽略 */ }
-  }
-
-  // ============ 关键词提示 ============
-  function keywordTip() {
-    var s = (state.idea || '').toLowerCase();
-    if (/ppt|幻灯片|演示|汇报/.test(s)) return '提醒：这像是做 PPT——第 4 题记得写清几页、给谁看。';
-    if (/代码|程序|脚本|网页|工具|功能|bug/.test(s)) return '提醒：这像是写代码——第 4 题记得写清用什么语言、要几个文件。';
-    if (/文案|文章|笔记|推文|公众号|小红书/.test(s)) return '提醒：这像是写文案——第 4 题记得写清发在哪、多少字。';
-    return '';
-  }
+  function clearDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch (e) { /* 忽略 */ } }
 
   // ============ 页面切换 ============
   function show(id) {
-    ['start', 'wizard', 'result'].forEach(function (s) {
+    ['start', 'wizard', 'result', 'feedback'].forEach(function (s) {
       $(s).classList.toggle('hidden', s !== id);
     });
   }
 
-  // ============ 向导渲染 ============
+  // ============ 向导 ============
+  function currentQ() { return state.qs[state.index]; }
+
   function renderStep() {
-    var list = qlist();
-    var q = list[state.index];
-    if (!q) { state.index = 0; q = list[0]; }
-    var ans = state.answers[q.id] || { choice: '', text: '' };
+    if (!state.qs.length) regenerate();
+    if (state.index >= state.qs.length) state.index = state.qs.length - 1;
+    var q = currentQ();
+    var ans = state.answers[q.key] || { choice: '', text: '' };
 
-    $('bar').style.width = ((state.index + 1) / list.length * 100) + '%';
-    $('stepMeta').textContent = mode().label + '版 · 第 ' + (state.index + 1) + ' / ' + list.length + ' 步 · ' + q.dim;
+    $('bar').style.width = ((state.index + 1) / state.qs.length * 100) + '%';
+    $('stepMeta').textContent = modeConf().label + '版 · 第 ' + (state.index + 1) + ' / ' + state.qs.length +
+      ' 步 · 类型：' + state.catLabel + ' · ' + q.dim;
     $('qTitle').textContent = q.title;
-
-    var tip = (q.id === 4) ? keywordTip() : '';
-    $('qHint').textContent = q.hint + (tip ? ' ' + tip : '');
-    $('qHint').className = 'hint' + (tip ? ' tip' : '');
+    $('qHint').textContent = q.hint;
+    $('qHint').className = 'hint';
 
     var box = $('options');
     box.innerHTML = '';
@@ -172,9 +118,9 @@
       b.className = 'chip' + (ans.choice === opt ? ' on' : '');
       b.textContent = opt;
       b.addEventListener('click', function () {
-        var cur = state.answers[q.id] || { choice: '', text: '' };
+        var cur = state.answers[q.key] || { choice: '', text: '' };
         cur.choice = (cur.choice === opt) ? '' : opt;
-        state.answers[q.id] = cur;
+        state.answers[q.key] = cur;
         renderStep();
         saveDraft();
       });
@@ -182,20 +128,22 @@
     });
 
     $('answer').value = ans.text || '';
-    $('counter').textContent = isRequired(q) ? '这一项必填' : '可跳过';
+    $('counter').textContent = q.required ? '这一项必填' : '可跳过';
     $('btnPrev').style.visibility = (state.index === 0) ? 'hidden' : 'visible';
-    $('btnNext').textContent = (state.index === list.length - 1) ? '生成' : '下一步';
+    $('btnNext').textContent = (state.index === state.qs.length - 1) ? '生成' : '下一步';
+
+    var vote = state.fb.votes[q.key] || 0;
+    $('btnUp').classList.toggle('on', vote === 1);
+    $('btnDown').classList.toggle('on', vote === -1);
   }
 
   function collectAnswer() {
-    var list = qlist();
-    var q = list[state.index];
-    var a = state.answers[q.id] || { choice: '', text: '' };
+    var q = currentQ();
+    var a = state.answers[q.key] || { choice: '', text: '' };
     a.text = ($('answer').value || '').trim();
-    state.answers[q.id] = a;
+    state.answers[q.key] = a;
     saveDraft();
-    var has = (a.choice && a.choice.trim()) || (a.text && a.text.trim());
-    if (isRequired(q) && !has) {
+    if (q.required && !hasText(a.choice) && !hasText(a.text)) {
       $('qHint').textContent = '这一项必须填：点一个上面的推荐答案，或者用自己的话写一句。';
       $('qHint').className = 'hint warn';
       return false;
@@ -203,181 +151,143 @@
     return true;
   }
 
-  // ============ 生成内容 ============
-  function answerText(id) {
-    var a = state.answers[id] || {};
+  // ============ 生成文本 ============
+  function answerText(key) {
+    var a = state.answers[key] || {};
     var parts = [];
     if (a.choice) parts.push(a.choice);
     if (a.text) parts.push(a.text);
     return parts.length ? parts.join('；') : '（未提供）';
   }
 
-  function answered(id) {
-    var a = state.answers[id] || {};
-    var hasChoice = !!(a.choice && a.choice.trim());
-    var hasText = !!(a.text && a.text.trim());
-    return hasChoice || hasText;
+  function answered(key) {
+    var a = state.answers[key] || {};
+    return hasText(a.choice) || hasText(a.text);
+  }
+
+  function groupByDim() {
+    var groups = [];
+    state.qs.forEach(function (q) {
+      var g = null;
+      for (var i = 0; i < groups.length; i += 1) if (groups[i].dim === q.dim) g = groups[i];
+      if (!g) { g = { dim: q.dim, items: [] }; groups.push(g); }
+      g.items.push(q);
+    });
+    return groups;
   }
 
   function buildStructuredPrompt() {
-    return [
-      '# 需求说明',
-      '',
-      '## 0. 我最初的想法',
-      state.idea,
-      '',
-      '## 1. 目标',
-      answerText(1),
-      '',
-      '## 2. 给谁看、谁会用',
-      answerText(2),
-      '',
-      '## 3. 手上已有的材料',
-      answerText(3),
-      '',
-      '## 4. 交付物（形式 + 数量）',
-      answerText(4),
-      '',
-      '## 5. 不能违反的限制',
-      answerText(5),
-      '',
-      '## 6. 明确不要（我最怕的）',
-      answerText(6),
-      '',
-      '## 7. 怎样算做好了',
-      answerText(7),
-      '',
-      '## 8. 第一版做到哪一步',
-      answerText(8),
-      '',
-      '# 执行要求',
+    var lines = ['# 需求说明', '', '## 0. 我最初的想法', state.idea, '', '（类型：' + state.catLabel + '）'];
+    groupByDim().forEach(function (g, gi) {
+      lines.push('', '## ' + (gi + 1) + '. ' + g.dim);
+      g.items.forEach(function (q) {
+        lines.push('- ' + q.short + '：' + answerText(q.key));
+      });
+    });
+    lines.push('', '# 执行要求',
       '1. 请严格按照以上需求完成。',
-      '2. 完成后先逐条对照「怎样算做好了」自检，把自检结果列出来，再输出最终结果。',
+      '2. 完成后先逐条对照「怎么算做好」自检，把自检结果列出来，再输出最终结果。',
       '3. 任何信息不足的地方，先向我确认，不要自行假设。',
-      '',
-      '# 自检清单（交付前逐条打勾）',
-      '- [ ] 交付物符合第 4 项要求的格式和数量',
-      '- [ ] 满足第 5 项里的全部限制',
-      '- [ ] 没有出现第 6 项里明确不要的内容',
-      '- [ ] 第 7 项「怎样算做好了」每一条都能打勾'
-    ].join('\n');
+      '', '# 自检清单（交付前逐条打勾）',
+      '- [ ] 交付物符合要求的格式和数量',
+      '- [ ] 满足全部限制',
+      '- [ ] 没有出现「明确不要」的内容',
+      '- [ ] 「怎么算做好」每一条都能打勾');
+    return lines.join('\n');
   }
 
   function buildPlainPrompt() {
-    return [
-      '# 我想让 AI 帮我做的事',
-      '',
-      state.idea,
-      '',
-      '## 具体一点',
-      answerText(1),
-      '',
-      '## 做出来给谁看',
-      answerText(2),
-      '',
-      '## 最后我要拿到什么',
-      answerText(4),
-      '',
-      '## 我最不想要的结果',
-      answerText(6),
-      '',
-      '## 怎样算做好了',
-      answerText(7),
-      '',
-      '# 请 AI 这样做',
+    var parts = ['# 我想让 AI 帮我做的事', '', state.idea, ''];
+    var wanted = { goal: 1, audience: 1, deliverable: 1, accept: 1 };
+    state.qs.forEach(function (q) {
+      if (wanted[q.key]) parts.push('## ' + q.short, answerText(q.key), '');
+      else if (!q.required || hasText((state.answers[q.key] || {}).choice) || hasText((state.answers[q.key] || {}).text)) {
+        parts.push('## ' + q.short, answerText(q.key), '');
+      }
+    });
+    parts.push('# 请 AI 这样做',
       '1. 先把你的理解用一两句话复述给我，确认没理解错再开始。',
-      '2. 做完之后，对照上面「怎样算做好了」一条条检查，把检查结果告诉我。',
+      '2. 做完之后，对照「怎么算做好」一条条检查，把检查结果告诉我。',
       '3. 有不清楚的地方先问我，不要自己猜。',
-      '',
-      '# 交付前自检（逐条打勾）',
+      '', '# 交付前自检（逐条打勾）',
       '- [ ] 拿到的东西就是我上面说的那样',
       '- [ ] 没有出现我明确不想要的内容',
-      '- [ ] 「怎样算做好了」每一条都能打勾'
-    ].join('\n');
+      '- [ ] 「怎么算做好」每一条都能打勾');
+    return parts.join('\n');
   }
 
   function buildOutput() {
-    return mode().output === 'plain' ? buildPlainPrompt() : buildStructuredPrompt();
+    return state.mode === 'zero' ? buildPlainPrompt() : buildStructuredPrompt();
   }
 
   function buildClarifyPrompt() {
-    if (state.mode === 'zero') {
-      return [
-        '你是我的需求澄清助手。我先给你一段很模糊的想法，你要在动手之前，帮我把需求问清楚。',
-        '',
-        '规则：',
-        '1. 一次只问一个问题，等我回答完再问下一个，不要一次问一堆。',
-        '2. 每个问题都直接给我 2-3 个现成的答案让我选，我不想自己想。',
-        '3. 能从我上面的话里猜出来的，先给个默认答案让我确认，不要重复问。',
-        '4. 下面这 5 件事没问清楚之前，不许开始干活。',
-        '',
-        '要问的 5 件事：',
-        '1. 做完之后你想拿到什么？',
-        '2. 做出来给谁看？',
-        '3. 最后要拿到什么形式的东西？要多少？',
-        '4. 你最不想要的结果是什么？',
-        '5. 怎样算做好了？请给我 3 条能打勾的标准，让我确认。',
-        '',
-        '问完之后，把答案整理成一段话给我确认，再开始做。',
-        '',
-        '我的想法是：',
-        '"""',
-        state.idea,
-        '"""'
-      ].join('\n');
-    }
-    return [
+    var lines = [
       '你是我的需求澄清助手。我先给你一段很模糊的想法，你要在动手之前，帮我把需求问清楚。',
       '',
       '规则：',
-      '1. 一次只问一个问题，等我回答完再问下一个，不要一次抛出多个问题。',
-      '2. 每个问题都给我 2-3 个推荐答案，让我点选或补充。',
-      '3. 能从我上面的话里推断出来的，先给默认值让我确认，不要重复问。',
-      '4. 第 1、4、7 项没问清楚之前，不许开始干活。',
+      '1. 一次只问一个问题，等我回答完再问下一个，不要一次抛出一堆问题。',
+      '2. 每个问题都给我 2-3 个现成的答案让我选，减少我的思考成本。',
+      '3. 能从我上面的话里猜到的，先给一个默认答案让我确认，不要重复问。',
+      '4. 下面这些要点没问清楚之前，不许开始干活；顺序可以按重要程度调整：',
+      ''
+    ];
+    state.qs.forEach(function (q, i) {
+      lines.push((i + 1) + '. ' + q.title);
+      lines.push('   推荐答案参考：' + q.options.join(' / '));
+    });
+    lines.push(
       '',
-      '按这 8 项依次问我：',
-      '1. 目标：做完之后我要拿到什么？',
-      '2. 受众：给谁看、谁会用？',
-      '3. 输入：我手上有哪些材料？',
-      '4. 交付物：要什么形式、多少量？',
-      '5. 硬约束：长度、时间、平台有什么限制？',
-      '6. 反例：我最讨厌的失败长什么样？',
-      '7. 验收标准：怎么算做好了？写 3 条能打勾的。',
-      '8. 迭代计划：第一版先做到哪一步，下一版改什么？',
+      '5. 问完之后，严格按下面的格式给我一份「需求总结」，不要加别的内容：',
       '',
-      '问完之后，把答案整理成一段结构化的需求提示词给我，并附上验收自检清单；',
-      '任何信息不足的地方，先问我，不要自行假设。',
+      '# 需求总结'
+    );
+    groupByDim().forEach(function (g) {
+      lines.push('## ' + g.dim);
+      g.items.forEach(function (q) { lines.push('### ' + q.short); });
+    });
+    lines.push(
       '',
       '我的想法是：',
       '"""',
       state.idea,
       '"""'
-    ].join('\n');
+    );
+    return lines.join('\n');
   }
 
   // ============ 结果页 ============
   function gapsText() {
-    var list = qlist();
     var missing = [];
-    list.forEach(function (q) { if (!answered(q.id)) missing.push(q.short); });
-    if (!missing.length) return '这 ' + list.length + ' 项都填了，AI 基本不用再追问。';
-    return '已填 ' + (list.length - missing.length) + ' / ' + list.length + ' 项。AI 可能还会追问：' + missing.join('、') + '。';
+    state.qs.forEach(function (q) { if (!answered(q.key)) missing.push(q.short); });
+    if (!missing.length) return '这 ' + state.qs.length + ' 项都填了，AI 基本不用再追问。';
+    return '已填 ' + (state.qs.length - missing.length) + ' / ' + state.qs.length +
+      ' 项。AI 可能还会追问：' + missing.join('、') + '。';
   }
 
-  function showResult(title, text, withGaps) {
+  function showResult(title, text, type) {
+    state.lastType = type;
     $('resultTitle').textContent = title;
-    $('gaps').textContent = withGaps ? gapsText() : '';
+    $('gaps').textContent = type === 'rules' ? gapsText() : '';
+    $('resultHint').textContent = type === 'clarify'
+      ? '复制这段，粘给 DeepSeek（或豆包）网页版；它问完你之后，把它的「需求总结」贴回下面的框里。'
+      : '复制后粘给豆包 / DeepSeek / 任何 AI 都行。';
     $('output').textContent = text;
     $('copyMsg').classList.add('hidden');
+    $('pasteArea').classList.toggle('hidden', type !== 'clarify');
+    $('btnReshuffle').classList.toggle('hidden', type !== 'clarify');
+    $('btnEdit').classList.toggle('hidden', type !== 'rules');
     show('result');
   }
 
   function copyOutput() {
     var text = $('output').textContent || '';
-    function ok() {
+    copyText(text, function () {
       $('copyMsg').classList.remove('hidden');
       setTimeout(function () { $('copyMsg').classList.add('hidden'); }, 1800);
-    }
+    });
+  }
+
+  function copyText(text, ok) {
     function fallback() {
       var ta = document.createElement('textarea');
       ta.value = text;
@@ -395,10 +305,157 @@
     }
   }
 
-  // ============ 事件绑定 ============
+  function assembleFinal() {
+    var pasted = ($('pasted').value || '').trim();
+    if (!pasted) { alert('先把 DeepSeek 输出里的「需求总结」贴进来。'); $('pasted').focus(); return; }
+    var final = [
+      '# 需求说明（我是和 AI 一条条澄清过的）',
+      '',
+      pasted,
+      '',
+      '# 执行要求',
+      '1. 请严格按照以上需求完成。',
+      '2. 完成后先对照「怎么算做好了」逐条自检，把自检结果列出来，再输出最终结果。',
+      '3. 信息不足的地方先问我，不要自行假设。',
+      '',
+      '# 最终自检清单（交付前逐条打勾）',
+      '- [ ] 交付物符合格式和数量要求',
+      '- [ ] 满足「必须遵守的限制」',
+      '- [ ] 没有出现「明确不要」的内容',
+      '- [ ] 「怎么算做好了」每一条都能打勾'
+    ].join('\n');
+    showResult('最终需求生成好了，复制给 AI 干活', final, 'final');
+    $('pasted').value = '';
+  }
+
+  // ============ 反馈 ============
+  function openFeedback() {
+    renderFbList();
+    state.fb.stuck = $('fbStuck').value || '';
+    state.fb.suggest = $('fbSuggest').value || '';
+    setOverall(state.fb.overall);
+    $('fbMsg').classList.add('hidden');
+    show('feedback');
+  }
+
+  function setOverall(v) {
+    state.fb.overall = v;
+    $('fbGood').classList.toggle('on', v === 3);
+    $('fbMid').classList.toggle('on', v === 2);
+    $('fbBad').classList.toggle('on', v === 1);
+  }
+
+  function renderFbList() {
+    var box = $('fbqList');
+    box.innerHTML = '';
+    if (!state.qs.length) {
+      var p = document.createElement('p');
+      p.className = 'hint';
+      p.textContent = '还没有生成过问题：先回首页写一句需求。';
+      box.appendChild(p);
+      return;
+    }
+    var title = document.createElement('p');
+    title.className = 'label';
+    title.textContent = '逐题反馈（这组问题共 ' + state.qs.length + ' 题）：';
+    box.appendChild(title);
+    state.qs.forEach(function (q) {
+      var row = document.createElement('div');
+      row.className = 'fbq-row';
+      var span = document.createElement('span');
+      span.className = 'fbq-title';
+      span.textContent = q.title;
+      row.appendChild(span);
+      [-1, 1].forEach(function (v) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'vbtn' + (state.fb.votes[q.key] === v ? ' on' : '');
+        b.textContent = v === 1 ? '👍' : '👎';
+        b.addEventListener('click', function () {
+          state.fb.votes[q.key] = (state.fb.votes[q.key] === v) ? 0 : v;
+          renderFbList();
+        });
+        row.appendChild(b);
+      });
+      box.appendChild(row);
+    });
+  }
+
+  function saveFeedback() {
+    var votes = {};
+    Object.keys(state.fb.votes).forEach(function (k) { if (state.fb.votes[k]) votes[k] = state.fb.votes[k]; });
+    var record = {
+      time: new Date().toISOString(),
+      mode: state.mode,
+      category: state.category,
+      idea: state.idea,
+      source: state.lastType,
+      qcount: state.qs.length,
+      questions: state.qs.map(function (q) { return q.title; }),
+      overall: state.fb.overall,
+      votes: votes,
+      stuck: ($('fbStuck').value || '').trim(),
+      suggest: ($('fbSuggest').value || '').trim()
+    };
+    var list = [];
+    try { list = JSON.parse(localStorage.getItem(FB_KEY) || '[]'); } catch (e) { list = []; }
+    if (!Array.isArray(list)) list = [];
+    list.push(record);
+    try { localStorage.setItem(FB_KEY, JSON.stringify(list)); } catch (e) { /* 忽略 */ }
+    $('fbMsg').textContent = '已保存 ✓ 本机共 ' + list.length + ' 条反馈（不会上传，可用「复制 / 导出」发我）';
+    $('fbMsg').classList.remove('hidden');
+  }
+
+  function exportFeedback() {
+    var list = [];
+    try { list = JSON.parse(localStorage.getItem(FB_KEY) || '[]'); } catch (e) { list = []; }
+    if (!Array.isArray(list)) list = [];
+    var text = JSON.stringify(list, null, 2);
+    var name = '需求澄清器-反馈-' + new Date().toISOString().slice(0, 10) + '.json';
+    try {
+      var blob = new Blob([text], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert('导出失败，可以改用「复制反馈」。');
+    }
+  }
+
+  function feedbackText() {
+    var votes = [];
+    state.qs.forEach(function (q) {
+      var v = state.fb.votes[q.key];
+      if (v) votes.push((v === 1 ? '👍 ' : '👎 ') + q.title);
+    });
+    return [
+      '【需求澄清器反馈】',
+      '模式：' + modeConf().label + ' ｜ 类型：' + state.catLabel + ' ｜ 题目数：' + state.qs.length,
+      '我写的需求：' + (state.idea || '（空）'),
+      '整体评价：' + ({ 3: '有用', 2: '一般', 1: '没用' })[state.fb.overall],
+      votes.length ? '逐题：\n' + votes.join('\n') : '逐题：（没投）',
+      '卡住的地方：' + (($('fbStuck').value || '').trim() || '（没写）'),
+      '建议：' + (($('fbSuggest').value || '').trim() || '（没写）')
+    ].join('\n');
+  }
+
+  function copyFeedback() {
+    copyText(feedbackText(), function () {
+      $('fbMsg').textContent = '反馈已复制 ✓ 粘到微信发我就行';
+      $('fbMsg').classList.remove('hidden');
+    });
+  }
+
+  // ============ 事件 ============
   function startWizard() {
     state.idea = ($('idea').value || '').trim();
     if (!state.idea) { alert('先在输入框写一句你要做的事，再开始。'); $('idea').focus(); return; }
+    regenerate();
     state.index = 0;
     show('wizard');
     renderStep();
@@ -408,15 +465,16 @@
   function startClarify() {
     state.idea = ($('idea').value || '').trim();
     if (!state.idea) { alert('先在输入框写一句你要做的事，再生成。'); $('idea').focus(); return; }
+    regenerate();
     saveDraft();
-    showResult('让 AI 来问你（复制给豆包 / DeepSeek）', buildClarifyPrompt(), false);
+    showResult('把这段提示词粘给 DeepSeek，让它来问你', buildClarifyPrompt(), 'clarify');
   }
 
   function nextStep() {
     if (!collectAnswer()) return;
-    var list = qlist();
-    if (state.index === list.length - 1) {
-      showResult('生成好了，直接复制给 AI', buildOutput(), true);
+    if (state.index === state.qs.length - 1) {
+      var title = state.mode === 'zero' ? '生成好了，直接复制给 AI' : '生成好了，直接复制给 AI';
+      showResult(title, buildOutput(), 'rules');
       return;
     }
     state.index += 1;
@@ -430,7 +488,7 @@
   }
 
   function editResult() {
-    state.index = qlist().length - 1;
+    state.index = state.qs.length - 1;
     renderStep();
     show('wizard');
   }
@@ -445,39 +503,75 @@
     applyMode(state.mode, false);
   }
 
-  // ============ 初始化 ============
+  function shuffle() {
+    state.salt += 1;
+    state.answers = {};
+    regenerate();
+    if (state.lastType === 'clarify' && !$('result').classList.contains('hidden')) {
+      showResult('换了一种问法，再粘一次给 DeepSeek', buildClarifyPrompt(), 'clarify');
+    } else {
+      $('catHint').textContent = '已换一批问法。' + catHintText();
+      $('btnWizard').textContent = '开始（约 ' + state.qs.length + ' 个问题）';
+    }
+    saveDraft();
+  }
+
+  function setVote(v) {
+    var q = currentQ();
+    state.fb.votes[q.key] = (state.fb.votes[q.key] === v) ? 0 : v;
+    renderStep();
+  }
+
   function init() {
-    var modeBtns = document.querySelectorAll('#modes .mode');
-    for (var i = 0; i < modeBtns.length; i++) {
-      (function (btn) {
-        btn.addEventListener('click', function () {
-          applyMode(btn.getAttribute('data-mode'), true);
-        });
-      })(modeBtns[i]);
-    }
-
-    var exBtns = document.querySelectorAll('#examples .ex');
-    for (var j = 0; j < exBtns.length; j++) {
-      (function (btn) {
-        btn.addEventListener('click', function () {
-          state.idea = btn.textContent;
-          $('idea').value = state.idea;
-          $('idea').focus();
-          saveDraft();
-        });
-      })(exBtns[j]);
-    }
-
+    $('btnModeDev').addEventListener('click', function () { applyMode('dev', true); });
+    $('btnModeZero').addEventListener('click', function () { applyMode('zero', true); });
     $('btnWizard').addEventListener('click', startWizard);
     $('btnClarify').addEventListener('click', startClarify);
+    $('btnShuffle').addEventListener('click', shuffle);
     $('btnNext').addEventListener('click', nextStep);
     $('btnPrev').addEventListener('click', prevStep);
     $('btnCopy').addEventListener('click', copyOutput);
+    $('btnReshuffle').addEventListener('click', shuffle);
     $('btnEdit').addEventListener('click', editResult);
     $('btnRestart').addEventListener('click', restart);
+    $('btnAssemble').addEventListener('click', assembleFinal);
+    $('btnFeedback').addEventListener('click', openFeedback);
+    $('btnFeedbackFoot').addEventListener('click', openFeedback);
+    $('btnUp').addEventListener('click', function () { setVote(1); });
+    $('btnDown').addEventListener('click', function () { setVote(-1); });
+    $('fbGood').addEventListener('click', function () { setOverall(3); });
+    $('fbMid').addEventListener('click', function () { setOverall(2); });
+    $('fbBad').addEventListener('click', function () { setOverall(1); });
+    $('btnSaveFb').addEventListener('click', saveFeedback);
+    $('btnCopyFb').addEventListener('click', copyFeedback);
+    $('btnExportFb').addEventListener('click', exportFeedback);
+    $('btnBackStart').addEventListener('click', function () { show('start'); });
+
+    ['ex1', 'ex2', 'ex3'].forEach(function (id) {
+      $(id).addEventListener('click', function () {
+        state.idea = $(id).textContent;
+        $('idea').value = state.idea;
+        $('idea').focus();
+        regenerate();
+        $('catHint').textContent = catHintText();
+        $('btnWizard').textContent = '开始（约 ' + state.qs.length + ' 个问题）';
+        saveDraft();
+      });
+    });
+
+    $('idea').addEventListener('input', function () {
+      state.idea = ($('idea').value || '').trim();
+      regenerate();
+      $('catHint').textContent = catHintText();
+      $('btnWizard').textContent = '开始（约 ' + state.qs.length + ' 个问题）';
+    });
 
     loadDraft();
     applyMode(state.mode, false);
+    $('idea').value = state.idea;
+    regenerate();
+    $('catHint').textContent = catHintText();
+    $('btnWizard').textContent = '开始（约 ' + state.qs.length + ' 个问题）';
   }
 
   if (document.readyState === 'loading') {

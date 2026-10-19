@@ -156,6 +156,40 @@ textarea:focus { outline: 2px solid #bfdbfe; border-color: var(--primary); backg
 }
 .ex:hover { border-color: var(--primary); background: var(--chip); }
 
+/* ---------- v0.3：两段式 / 逐题反馈 / 反馈表单 ---------- */
+.paste { border: 1px dashed var(--chip-line); border-radius: 10px; padding: 12px; margin-top: 14px; background: #f8faff; }
+.paste .label { margin-top: 0; }
+
+.vrow { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.votehint { color: var(--sub); font-size: 12px; }
+.vbtn {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--sub);
+  border-radius: 99px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.vbtn:hover { border-color: #c9ced6; }
+.vbtn.on { border-color: var(--primary); background: var(--chip); color: #3730a3; }
+
+.fbq { margin-top: 8px; }
+.fbq-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f1f2f5; }
+.fbq-title { flex: 1; font-size: 13px; color: var(--text); }
+
+.linkbtn {
+  border: 0;
+  background: none;
+  color: var(--primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
 @media (max-width: 560px) {
   body { padding: 10px; }
   .top h1 { font-size: 22px; }
